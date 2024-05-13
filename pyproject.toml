@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "news-crawler"
+version = "0.1.0"
+description = "this is news-crawler"
+authors = ["ydj515 <ydj515@hanmail.net>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.111.0"
+pytest = "^8.2.0"
+uvicorn = "^0.29.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

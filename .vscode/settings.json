@@ -1,0 +1,5 @@
+{
+    "editor.tabSize": 4, // 탭 크기 설정
+    "editor.insertSpaces": true, // 탭 대신 공백 삽입 설정
+    "editor.formatOnSave": true // 저장 시 자동 포맷 설정
+}
