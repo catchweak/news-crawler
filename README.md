@@ -1,23 +1,30 @@
 # news-crawler
+
 news-crawler
 
 ## environment
+
 > python 3.10.11
 > fast-api
 > poetry # ISTALL.md 참조
+> selenium :
 
 ## start
+
 ### 1. activate virtual env
+
 ```sh
 poetry shell
 ```
 
 ### 2. install dependencies
+
 ```sh
 poetry install
 ```
 
 ### 3. run server
+
 ```sh
 # poetry shell 이 실행 되어 있는 경우
 uvicorn app.main:app --reload
@@ -27,10 +34,18 @@ poetry run uvicorn app.main:app
 ```
 
 ### 4. run test
+
 ```sh
 pytest
 ```
 
+### db migration
+
+```sh
+alembic revision -m "commit 메시지 작성"
+```
+
 ### check api docs
+
 http://localhost:8000/docs
 http://localhost:8000/redoc
