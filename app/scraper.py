@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from sqlalchemy.orm import sessionmaker
 from .database import SessionLocal
 from .models import Article
+from . import site_repo, category_repo
 from datetime import datetime
 import requests
 import urllib.request
@@ -14,26 +15,26 @@ from bs4 import BeautifulSoup
 
 def scrap_url():
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
-    base_url = 'https://news.naver.com/breakingnews/section/100'
 
-    # 100 : 정치
-    # 264 : 대통령실
-    # 265 : 국회/정당
-    # 266 : 행정
-    # 267 : 국방/외교
-    # 268 : 북한
-    # 269 : 정치일반
-    for section in range(264,265):
-        target_url = base_url + '/'+ str(section)
-        print(target_url)
-        try:
-            driver.get(target_url)
-            more_news_click(driver, section)
-            print("All tasks completed. The browser will remain open.")
-        except Exception as e:
-            print(f'An error occurred during the main execution: {e}')
+    sites = site_repo.get_sites()
+    
+    for site in sites:
+        categories = category_repo.get_categories(site.id)
 
-def more_news_click(driver, section):
+        for category in categories:
+            if category.code == '260':
+                target_url = site.base_url + '/'+ category.parent_code +'/'+ category.code # str(264) -> category.code
+                print(target_url)
+
+                try:
+                    driver.get(target_url)
+                    more_news_click(driver, category.id, site.id) # section이 category.id가 되면됨
+                    print("All tasks completed. The browser will remain open.")
+                except Exception as e:
+                    print(f'An error occurred during the main execution: {e}')
+            
+
+def more_news_click(driver, category_id, site_id):
     """
     뉴스 더보기 클릭
     """
@@ -59,35 +60,32 @@ def more_news_click(driver, section):
             driver.execute_script("arguments[0].click();", a_tag)
             print("Clicked 'more news' button.")
         except Exception as e:
-            get_detail_url(driver, section)
-            print(f'EEEEEEEE: {e}')
+            get_detail_url(driver, category_id)
+            print(f'Exception occurred: {e}')
             break
 
-def get_detail_url(driver, section):
+def get_detail_url(driver, category_id):
     """
     상세페이지 url 조사
     """
-    print('aaaaaaaa')
+
     news_url_tag = WebDriverWait(driver, 100).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="newsct"]/div[2]/div/div[1]/div/ul/li/div/div/div/a'))
     )
     news_url_tags = news_url_tag.find_elements(By.XPATH, '//*[@id="newsct"]/div[2]/div/div[1]/div/ul/li/div/div/div/a')
 
-    print('bbbbbb')
-    print(str(len(news_url_tags)))
-    print('cccccc')
     # 각 링크 요소의 href 속성 값 가져와 출력
     for news_url_tag in news_url_tags:
         news_url = news_url_tag.get_attribute("href")
-        save_to_db(news_url, section)
+        save_to_db(news_url, category_id)
 
-def save_to_db(news_url, section):
+def save_to_db(news_url, category_id):
     """
     DB에 기사 데이터 저장
     """
     db = SessionLocal()
     try:
-        article = Article(url=news_url, category= section)
+        article = Article(url=news_url, category_id=category_id)
         db.add(article)
         db.commit()
     except Exception as e:
@@ -155,17 +153,17 @@ def update_article_content(article: Article, db):
             print(author_tag.text)
             article.author = author_tag.text
 
-            # input date
+            # create date
             created_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_DATE_TIME'})
             print('==========created_at_tag==========')
             print(created_at_tag.text)
-            article.created_at = created_at_tag.text
+            article.article_created_at = created_at_tag.text
 
-            # input date
+            # update date
             updated_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_MODIFY_DATE_TIME'})
             print('==========updated_at_tag==========')
             print(updated_at_tag.text)
-            article.updated_at = updated_at_tag.text
+            article.article_updated_at = updated_at_tag.text
 
             # like count
             # like_count_tag = soup.find('span', {'class', 'u_likeit_text _count num'})
