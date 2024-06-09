@@ -12,19 +12,22 @@ news-crawler
 ## start
 
 ### 1. activate virtual env
-
 ```sh
 poetry shell
 ```
 
 ### 2. install dependencies
-
 ```sh
 poetry install
 ```
 
-### 3. run server
+### 3. settings.json 파일 생성
+본인의 환경에 맞게 `settings.json` 파일 생성
+```sh
+cp settings-sample.json settings.json
+```
 
+### 4. run server
 ```sh
 # poetry shell 이 실행 되어 있는 경우
 uvicorn app.main:app --reload
@@ -33,8 +36,7 @@ uvicorn app.main:app --reload
 poetry run uvicorn app.main:app
 ```
 
-### 4. run test
-
+### run test
 ```sh
 pytest
 ```
@@ -46,6 +48,5 @@ alembic revision -m "commit 메시지 작성"
 ```
 
 ### check api docs
-
-http://localhost:8000/docs
+http://localhost:8000/docs <br/>
 http://localhost:8000/redoc
