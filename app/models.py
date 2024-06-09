@@ -47,3 +47,6 @@ class Article(Base):
     collected_at = Column(DateTime, default=datetime.utcnow, comment="데이터 수집일")
     
     category = relationship("Category", back_populates="articles")
+
+    # def __str__(s):
+    #     return "id: " + s.id + ", category_id: " + str(s.category_id) + ", url: " + s.url + ", origin_url: " + s.origin_url + ", headline: " + s.headline + ", body: " + s.body + ", img_url: " + s.img_url + ", summary: " + s.summary + ", author: " + s.author + ", article_created_at: " + s.article_created_at + ", article_updated_at: " + s.article_updated_at

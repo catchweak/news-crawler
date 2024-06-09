@@ -22,7 +22,7 @@ def scrap_url():
         categories = category_repo.get_categories(site.id)
 
         for category in categories:
-            if category.code == '260':
+            if category.code == '263':
                 target_url = site.base_url + '/'+ category.parent_code +'/'+ category.code # str(264) -> category.code
                 print(target_url)
 
@@ -98,8 +98,8 @@ def save_to_db(news_url, category_id):
 def scrap_detail_page():
     db = SessionLocal()
     try:
-        # articles = db.query(Article).all()
-        articles = db.query(Article).limit(1).all()
+        articles = db.query(Article).all()
+        # articles = db.query(Article).limit(1).all()
 
         for article in articles:
             update_article_content(article, db)
@@ -109,6 +109,9 @@ def scrap_detail_page():
 def update_article_content(article: Article, db):
     # 기사의 URL 가져오기
     article_url = article.url
+    print("--------------")
+    print(str(article.category_id))
+    print("--------------")
 
     # BeautifulSoup를 사용하여 기사의 내용을 스크랩
     try:
@@ -162,8 +165,8 @@ def update_article_content(article: Article, db):
             # update date
             updated_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_MODIFY_DATE_TIME'})
             print('==========updated_at_tag==========')
-            print(updated_at_tag.text)
-            article.article_updated_at = updated_at_tag.text
+            if updated_at_tag != None:
+                article.article_updated_at = updated_at_tag.text
 
             # like count
             # like_count_tag = soup.find('span', {'class', 'u_likeit_text _count num'})

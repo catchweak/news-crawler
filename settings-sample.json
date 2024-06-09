@@ -1,0 +1,9 @@
+{
+    "database": {
+        "username": "USERNAME",
+        "password": "PASSWORD",
+        "host": "HOST",
+        "port": 3306,
+        "dbname": "DATABASE"
+    }
+  }
