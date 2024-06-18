@@ -32,6 +32,9 @@ cp settings-sample.json settings.json
 # poetry shell 이 실행 되어 있는 경우
 uvicorn app.main:app --reload
 
+# poetry shell 이 실행 되어 있으면서 port 변경하는 경우
+uvicorn app.main:app --port 8888 --reload
+
 # poetry shell 이 실행 되어 있지 않은 경우
 poetry run uvicorn app.main:app
 ```
