@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from app.scraper import scrap_url, scrap_detail_page
+from app.scraper import scrap_url, scrap_detail_page, scrap_single_page
+from .payload import UrlRequest
 
 app = FastAPI()
 
@@ -9,6 +10,12 @@ def read_root():
     return {"Hello": "World"}
 
 @app.get("/scrap")
-def aa():
+def scrap():
     scrap_detail_page()
     return {"Hello": "World"}
+
+@app.post("/scrap-url")
+def scrap_url(request: UrlRequest):
+    scrap_single_page(request.url)
+    return {"scraped_url": request.url}
+

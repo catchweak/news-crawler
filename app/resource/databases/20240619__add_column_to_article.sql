@@ -1,0 +1,1 @@
+alter table catch_weak.article add column redirected_url varchar(255);

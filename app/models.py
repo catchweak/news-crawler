@@ -36,6 +36,7 @@ class Article(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True, comment="id")
     category_id = Column(Integer, ForeignKey("category.id"), nullable=True, comment="카테고리 id")
     url = Column(String(255), nullable=False, comment="기사 url")
+    redirected_url = Column(String(255), nullable=False, comment="기사 redirect url")
     origin_url = Column(String(255), nullable=True, comment="기사 원본 url")
     headline = Column(String(500), nullable=False, comment="기사 제목")
     body = Column(String, nullable=False, comment="기사 본문")

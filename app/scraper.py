@@ -22,7 +22,7 @@ def scrap_url():
         categories = category_repo.get_categories(site.id)
 
         for category in categories:
-            if category.code == '263':
+            if category.code == '250':
                 target_url = site.base_url + '/'+ category.parent_code +'/'+ category.code # str(264) -> category.code
                 print(target_url)
 
@@ -94,12 +94,29 @@ def save_to_db(news_url, category_id):
     finally:
         db.close()
 
-
-def scrap_detail_page():
+def scrap_single_page(request_url):
+    """
+    한개의 url에 대하여 단일 크롤링
+    """
     db = SessionLocal()
     try:
-        articles = db.query(Article).all()
+        articles = db.query(Article).filter(Article.url==request_url).all()
+
+        for article in articles:
+            update_article_content(article, db)
+    finally:
+        db.close()
+
+def scrap_detail_page():
+    """
+    기사 상세 정보 크롤링
+    """
+    db = SessionLocal()
+    try:
+        # articles = db.query(Article).all()
         # articles = db.query(Article).limit(1).all()
+        # articles = db.query(Article).filter(Article.headline.is_(None)).all()
+        articles = db.query(Article).filter(Article.author.is_(None)).all()
 
         for article in articles:
             update_article_content(article, db)
@@ -107,65 +124,84 @@ def scrap_detail_page():
         db.close()
 
 def update_article_content(article: Article, db):
-    # 기사의 URL 가져오기
+    """
+    기사 상세 정보 업데이트
+    """
     article_url = article.url
     print("--------------")
-    print(str(article.category_id))
+    print("id : " + str(article.id))
+    print("category_id : " + str(article.category_id))
+    print("url : " + str(article.url))
     print("--------------")
 
     # BeautifulSoup를 사용하여 기사의 내용을 스크랩
     try:
-        response = requests.get(article_url)
+        response = requests.get(article_url, allow_redirects=False)
+        print("response code : " + str(response.status_code))
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
-            
             # headline
             headline_tag = soup.find('h2', {'id':'title_area'})
-            headline = headline_tag.find('span').text
-            print('==========headline==========')
-            print(headline)
-            article.headline = headline
+            if headline_tag is not None:
+                headline = headline_tag.find('span').text
+                print('==========headline==========')
+                print(headline)
+                article.headline = headline
 
             # body
             dic_area_tag = soup.find('article', {'id':'dic_area'})
-            print('==========body==========')
-            print(dic_area_tag.text)
-            article.body = dic_area_tag.text
+            if dic_area_tag is not None:
+                print('==========body==========')
+                print(dic_area_tag.text)
+                article.body = dic_area_tag.text
 
-            # summary
-            media_end_summary_tag = dic_area_tag.findAll('strong')[0]
-            print('==========summary==========')
-            print(media_end_summary_tag.text)
-            article.summary = media_end_summary_tag.text
-
-            # image url
-            image_url_tag = dic_area_tag.find('img', {'id': 'img1'})
-            print('==========image url==========')
-            print(image_url_tag['data-src'])
-            article.img_url = image_url_tag['data-src']
+                # summary
+                media_end_summary_tag_list = dic_area_tag.findAll('strong')
+                if media_end_summary_tag_list is not None and media_end_summary_tag_list != []:
+                    media_end_summary_tag = dic_area_tag.findAll('strong')[0]
+                    print(media_end_summary_tag)
+                    print('==========summary==========')
+                    print(media_end_summary_tag.text)
+                    article.summary = media_end_summary_tag.text
+                
+                # image url
+                image_url_tag = dic_area_tag.find('img', {'id': 'img1'})
+                if image_url_tag is not None:
+                    print('==========image url==========')
+                    print(image_url_tag['data-src'])
+                    article.img_url = image_url_tag['data-src']
 
             # origin url
             origin_article_url_tag = soup.find('a', {'class', 'media_end_head_origin_link'})
-            print('==========origin_article_url_tag==========')
-            print(origin_article_url_tag['href'])
-            article.origin_url = origin_article_url_tag['href']
+            if origin_article_url_tag is not None:
+                print('==========origin_article_url_tag==========')
+                print(origin_article_url_tag['href'])
+                article.origin_url = origin_article_url_tag['href']
 
             # author
             author_tag = soup.find('em', {'class', 'media_end_head_journalist_name'})
-            print('==========author_tag==========')
-            print(author_tag.text)
-            article.author = author_tag.text
+            if author_tag is not None:
+                print('==========author_tag==========')
+                print(author_tag)
+                print(author_tag.text)
+                article.author = author_tag.text
 
             # create date
             created_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_DATE_TIME'})
-            print('==========created_at_tag==========')
-            print(created_at_tag.text)
-            article.article_created_at = created_at_tag.text
+            if created_at_tag is not None:
+                print('==========created_at_tag==========')
+                print(created_at_tag.text)
+                article.article_created_at = created_at_tag.text
 
             # update date
             updated_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_MODIFY_DATE_TIME'})
-            print('==========updated_at_tag==========')
+            if updated_at_tag is not None:
+                print('==========created_at_tag==========')
+                print(created_at_tag.text)
+                article.article_created_at = created_at_tag.text
+
             if updated_at_tag != None:
+                print('==========updated_at_tag==========')
                 article.article_updated_at = updated_at_tag.text
 
             # like count
@@ -177,14 +213,17 @@ def update_article_content(article: Article, db):
             #     pass
 
             # comment count bs4로는 불가능
-            
-            # 기사 내용 업데이트 후 DB에 저장
-            try:
-                db.add(article)
-                db.commit()
-            except Exception as e:
-                print(f"An error occurred while committing changes to the database: {e}")
-                db.rollback()
+
+        elif response.status_code == 302:
+            article.redirected_url = get_moved_page_url(article_url)
+
+        # 기사 내용 업데이트 후 DB에 저장
+        try:
+            db.add(article)
+            db.commit()
+        except Exception as e:
+            print(f"An error occurred while committing changes to the database: {e}")
+            db.rollback()
     except Exception as e:
         print(f"An error occurred while updating article content: {e}")
 
@@ -197,3 +236,36 @@ def get_bsobj(url):
     bs_obj = BeautifulSoup(html, "html.parser") # url에 해당하는 html이 bsObj에 들어감
 
     return bs_obj
+
+def get_moved_page_url(start_url, max_redirects=10):
+    """
+    302응답을 내려주는 url들에 대하여 최종적으로 마지막 url을 return
+    """
+    current_url = start_url
+    redirect_count = 0
+
+    while redirect_count < max_redirects:
+        response = requests.get(current_url, allow_redirects=False)
+        if response.status_code in (301, 302):
+            # Extract the Location header to get the new URL
+            new_url = response.headers.get('Location')
+            if not new_url:
+                break
+            
+            # Handle relative URLs by joining with the current URL
+            if not new_url.startswith('http'):
+                from urllib.parse import urljoin
+                new_url = urljoin(current_url, new_url)
+            
+            # Update current URL to the new URL and increment redirect count
+            current_url = new_url
+            redirect_count += 1
+        else:
+            # If no more redirects, return the final URL
+            return current_url
+
+    # If max redirects reached, return None or raise an exception
+    if redirect_count == max_redirects:
+        raise Exception("Max redirects reached. Possible infinite loop.")
+    else:
+        return current_url
