@@ -7,7 +7,7 @@ news-crawler
 > python 3.10.11
 > fast-api
 > poetry # ISTALL.md 참조
-> selenium :
+> selenium
 
 ## start
 
