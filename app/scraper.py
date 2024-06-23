@@ -12,6 +12,8 @@ from datetime import datetime
 import requests
 import urllib.request
 from bs4 import BeautifulSoup
+import re
+import time
 
 def scrap_url():
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
@@ -123,15 +125,21 @@ def scrap_detail_page():
     finally:
         db.close()
 
-def update_article_content(article: Article, db):
+def update_article_content(article: Article, db, division='plain'):
     """
     기사 상세 정보 업데이트
     """
-    article_url = article.url
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
+
+    if division == 'plain':
+        article_url = article.url
+    else:
+        article_url = article.redirected_url
+
     print("--------------")
     print("id : " + str(article.id))
     print("category_id : " + str(article.category_id))
-    print("url : " + str(article.url))
+    print("url : " + str(article_url))
     print("--------------")
 
     # BeautifulSoup를 사용하여 기사의 내용을 스크랩
@@ -139,80 +147,188 @@ def update_article_content(article: Article, db):
         response = requests.get(article_url, allow_redirects=False)
         print("response code : " + str(response.status_code))
         if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            # headline
-            headline_tag = soup.find('h2', {'id':'title_area'})
-            if headline_tag is not None:
-                headline = headline_tag.find('span').text
-                print('==========headline==========')
-                print(headline)
-                article.headline = headline
 
-            # body
-            dic_area_tag = soup.find('article', {'id':'dic_area'})
-            if dic_area_tag is not None:
-                print('==========body==========')
-                print(dic_area_tag.text)
-                article.body = dic_area_tag.text
+            if division == 'plain':
+                soup = BeautifulSoup(response.content, 'html.parser')
+                # headline
+                headline_tag = soup.find('h2', {'id':'title_area'})
+                if headline_tag is not None:
+                    print('==========headline==========')
+                    headline = headline_tag.find('span').text
+                    print(headline)
+                    article.headline = headline
 
-                # summary
-                media_end_summary_tag_list = dic_area_tag.findAll('strong')
-                if media_end_summary_tag_list is not None and media_end_summary_tag_list != []:
-                    media_end_summary_tag = dic_area_tag.findAll('strong')[0]
-                    print(media_end_summary_tag)
-                    print('==========summary==========')
-                    print(media_end_summary_tag.text)
-                    article.summary = media_end_summary_tag.text
+                # body
+                dic_area_tag = soup.find('article', {'id':'dic_area'})
+                if dic_area_tag is not None:
+                    print('==========body==========')
+                    print(dic_area_tag.text)
+                    article.body = dic_area_tag.text
+
+                    # summary
+                    media_end_summary_tag_list = dic_area_tag.findAll('strong')
+                    if media_end_summary_tag_list is not None and media_end_summary_tag_list != []:
+                        media_end_summary_tag = dic_area_tag.findAll('strong')[0]
+                        print('==========summary==========')
+                        print(media_end_summary_tag.text)
+                        article.summary = media_end_summary_tag.text
+                    
+                    # image url
+                    image_url_tag = dic_area_tag.find('img', {'id': 'img1'})
+                    if image_url_tag is not None:
+                        print('==========image url==========')
+                        print(image_url_tag['data-src'])
+                        article.img_url = image_url_tag['data-src']
+
+                # origin url
+                origin_article_url_tag = soup.find('a', {'class', 'media_end_head_origin_link'})
+                if origin_article_url_tag is not None:
+                    print('==========origin_article_url_tag==========')
+                    print(origin_article_url_tag['href'])
+                    article.origin_url = origin_article_url_tag['href']
+
+                # author
+                author_tag = soup.find('em', {'class', 'media_end_head_journalist_name'})
+                if author_tag is not None:
+                    print('==========author_tag==========')
+                    print(author_tag)
+                    print(author_tag.text)
+                    article.author = author_tag.text
+
+                # create date
+                created_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_DATE_TIME'})
+                if created_at_tag is not None:
+                    print('==========created_at_tag==========')
+                    print(created_at_tag.text)
+                    article.article_created_at = created_at_tag.text
+
+                # update date
+                updated_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_MODIFY_DATE_TIME'})
+                if updated_at_tag is not None:
+                    print('==========created_at_tag==========')
+                    print(created_at_tag.text)
+                    article.article_created_at = created_at_tag.text
+
+                if updated_at_tag != None:
+                    print('==========updated_at_tag==========')
+                    article.article_updated_at = updated_at_tag.text
+
+                # like count
+                # like_count_tag = soup.find('span', {'class', 'u_likeit_text _count num'})
+                # print('==========like_count_tag==========')
+                # try:
+                #     print(like_count_tag.text)
+                # except:
+                #     pass
+
+                # comment count bs4로는 불가능
+            elif division == 'entertain':
+                driver.get(article_url)
+                time.sleep(2)
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
                 
+                # headline
+                pattern = re.compile(r'^NewsEndMain_article_title__')
+                headline_tag = soup.find('h2', class_=pattern)
+                if headline_tag is not None:
+                    print('==========headline==========')
+                    headline = headline_tag.text
+                    print(headline)
+                    article.headline = headline
+                
+                # body
+                body_tag = soup.find('div', {'class':'_article_content'})
+                if body_tag is not None:
+                    print('==========body==========')
+                    print(body_tag.text)
+                    article.body = body_tag.text
+                
+                # TODO : summary
+
                 # image url
-                image_url_tag = dic_area_tag.find('img', {'id': 'img1'})
-                if image_url_tag is not None:
-                    print('==========image url==========')
-                    print(image_url_tag['data-src'])
-                    article.img_url = image_url_tag['data-src']
+                image_span_tag = soup.find('span', {'class':'NewsEndMain_image_wrap__djL-o'})
+                if image_span_tag is not None:
+                    img_tag = image_span_tag.find('img')
+                    if img_tag and 'src' in img_tag.attrs:
+                        print('==========image url==========')
+                        print(img_tag['src'])
+                        article.img_url = img_tag['src']
+                
+                # origin url
+                origin_article_url_tag = soup.find('a', {'class', 'NewsEndMain_link_origin_article__7igDs'})
+                if origin_article_url_tag is not None:
+                    print('==========origin_article_url_tag==========')
+                    print(origin_article_url_tag['href'])
+                    article.origin_url = origin_article_url_tag['href']
 
-            # origin url
-            origin_article_url_tag = soup.find('a', {'class', 'media_end_head_origin_link'})
-            if origin_article_url_tag is not None:
-                print('==========origin_article_url_tag==========')
-                print(origin_article_url_tag['href'])
-                article.origin_url = origin_article_url_tag['href']
+                # TODO : author
+                # author가 존재하는 기사를 연예, 스포츠에서는 보지 못함.
+                
+                # create date
+                date_tag_list = soup.findAll('em', {'class', 'date'})
+                if date_tag_list is not None:
+                    print('==========created_at_tag==========')
+                    print(date_tag_list[0].text)
+                    article.article_created_at = date_tag_list[0].text
 
-            # author
-            author_tag = soup.find('em', {'class', 'media_end_head_journalist_name'})
-            if author_tag is not None:
-                print('==========author_tag==========')
-                print(author_tag)
-                print(author_tag.text)
-                article.author = author_tag.text
+                    if len(date_tag_list) > 1:
+                        print('==========updated_at_tag==========')
+                        print(date_tag_list[1].text)
+                        article.article_updated_at = date_tag_list[1].text
 
-            # create date
-            created_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_DATE_TIME'})
-            if created_at_tag is not None:
-                print('==========created_at_tag==========')
-                print(created_at_tag.text)
-                article.article_created_at = created_at_tag.text
+            elif division == 'sports':
+                driver.get(article_url)
+                time.sleep(2)
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
+                
+                # headline
+                pattern = re.compile(r'^NewsEndMain_article_title__')
+                headline_tag = soup.find('h2', class_=pattern)
+                if headline_tag is not None:
+                    print('==========headline==========')
+                    headline = headline_tag.text
+                    print(headline)
+                    article.headline = headline
+                
+                # body
+                body_tag = soup.find('div', {'class':'_article_content'})
+                if body_tag is not None:
+                    print('==========body==========')
+                    print(body_tag.text)
+                    article.body = body_tag.text
+                
+                # TODO : summary
 
-            # update date
-            updated_at_tag = soup.find('span', {'class', 'media_end_head_info_datestamp_time _ARTICLE_MODIFY_DATE_TIME'})
-            if updated_at_tag is not None:
-                print('==========created_at_tag==========')
-                print(created_at_tag.text)
-                article.article_created_at = created_at_tag.text
+                # image url
+                image_span_tag = soup.find('span', {'class':'NewsEndMain_image_wrap__djL-o'})
+                if image_span_tag is not None:
+                    img_tag = image_span_tag.find('img')
+                    if img_tag and 'src' in img_tag.attrs:
+                        print('==========image url==========')
+                        print(img_tag['src'])
+                        article.img_url = img_tag['src']
+                
+                # origin url
+                origin_article_url_tag = soup.find('a', {'class', 'NewsEndMain_link_origin_article__7igDs'})
+                if origin_article_url_tag is not None:
+                    print('==========origin_article_url_tag==========')
+                    print(origin_article_url_tag['href'])
+                    article.origin_url = origin_article_url_tag['href']
 
-            if updated_at_tag != None:
-                print('==========updated_at_tag==========')
-                article.article_updated_at = updated_at_tag.text
+                # TODO : author
+                # author가 존재하는 기사를 연예, 스포츠에서는 보지 못함.
+                
+                # create date
+                date_tag_list = soup.findAll('em', {'class', 'NewsEndMain_date__xjtsQ'})
+                if date_tag_list is not None:
+                    print('==========created_at_tag==========')
+                    print(date_tag_list[0].text)
+                    article.article_created_at = date_tag_list[0].text
 
-            # like count
-            # like_count_tag = soup.find('span', {'class', 'u_likeit_text _count num'})
-            # print('==========like_count_tag==========')
-            # try:
-            #     print(like_count_tag.text)
-            # except:
-            #     pass
-
-            # comment count bs4로는 불가능
+                    if len(date_tag_list) > 1:
+                        print('==========updated_at_tag==========')
+                        print(date_tag_list[1].text)
+                        article.article_updated_at = date_tag_list[1].text
 
         elif response.status_code == 302:
             article.redirected_url = get_moved_page_url(article_url)
@@ -247,17 +363,14 @@ def get_moved_page_url(start_url, max_redirects=10):
     while redirect_count < max_redirects:
         response = requests.get(current_url, allow_redirects=False)
         if response.status_code in (301, 302):
-            # Extract the Location header to get the new URL
             new_url = response.headers.get('Location')
             if not new_url:
                 break
             
-            # Handle relative URLs by joining with the current URL
             if not new_url.startswith('http'):
                 from urllib.parse import urljoin
                 new_url = urljoin(current_url, new_url)
             
-            # Update current URL to the new URL and increment redirect count
             current_url = new_url
             redirect_count += 1
         else:
@@ -269,3 +382,20 @@ def get_moved_page_url(start_url, max_redirects=10):
         raise Exception("Max redirects reached. Possible infinite loop.")
     else:
         return current_url
+    
+def scrap_detail_page_redirected_url(division):
+    """
+    스포츠,연예 기사 상세 정보 크롤링
+    """
+    db = SessionLocal()
+    try:
+        # 연예 뉴스
+        if division == 'entertain':
+            articles = db.query(Article).filter(Article.redirected_url.startswith('https://m.entertain.naver.com')).all()
+        elif division == 'sports':
+            articles = db.query(Article).filter(Article.redirected_url.startswith('https://m.sports.naver.com')).all()
+
+        for article in articles:
+            update_article_content(article, db, division)
+    finally:
+        db.close()
