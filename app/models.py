@@ -1,10 +1,16 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
 from datetime import datetime
 
 Base = declarative_base()
+
+article_category = Table(
+    'article_category', Base.metadata,
+    Column('article_id', Integer, ForeignKey('article.id'), primary_key=True),
+    Column('category_id', Integer, ForeignKey('category.id'), primary_key=True)
+)
 
 class Site(Base):
     __tablename__ = "site"
@@ -28,13 +34,12 @@ class Category(Base):
     updated_at = Column(DateTime, nullable=True, comment="수정일")
     
     site = relationship("Site", back_populates="categories")
-    articles = relationship("Article", back_populates="category")
+    articles = relationship("Article", secondary=article_category, back_populates="categories")
 
 class Article(Base):
     __tablename__ = "article"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True, comment="id")
-    category_id = Column(Integer, ForeignKey("category.id"), nullable=True, comment="카테고리 id")
     url = Column(String(255), nullable=False, comment="기사 url")
     redirected_url = Column(String(255), nullable=False, comment="기사 redirect url")
     origin_url = Column(String(255), nullable=True, comment="기사 원본 url")
@@ -47,7 +52,7 @@ class Article(Base):
     article_updated_at = Column(String(255), nullable=True, comment="기사 수정일")
     collected_at = Column(DateTime, default=datetime.utcnow, comment="데이터 수집일")
     
-    category = relationship("Category", back_populates="articles")
+    categories = relationship("Category", secondary=article_category, back_populates="articles")
 
     # def __str__(s):
     #     return "id: " + s.id + ", category_id: " + str(s.category_id) + ", url: " + s.url + ", origin_url: " + s.origin_url + ", headline: " + s.headline + ", body: " + s.body + ", img_url: " + s.img_url + ", summary: " + s.summary + ", author: " + s.author + ", article_created_at: " + s.article_created_at + ", article_updated_at: " + s.article_updated_at
