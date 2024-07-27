@@ -138,7 +138,7 @@ def update_article_content(article: Article, db, division='plain'):
 
     print("--------------")
     print("id : " + str(article.id))
-    print("category_id : " + str(article.category_id))
+    print("category_id : " + str(article.categories))
     print("url : " + str(article_url))
     print("--------------")
 
@@ -162,8 +162,22 @@ def update_article_content(article: Article, db, division='plain'):
                 dic_area_tag = soup.find('article', {'id':'dic_area'})
                 if dic_area_tag is not None:
                     print('==========body==========')
-                    print(dic_area_tag.text)
-                    article.body = dic_area_tag.text
+                    content = []
+                    for element in dic_area_tag.descendants:
+                        if element.name == 'img':
+                            img_src = element.get('data-src', '')
+                            img_alt = element.get('alt', '')
+                            if img_src:  # data-src가 존재하는 경우에만 커스텀 태그로 감싸기
+                                custom_tagged_img = f'<catch-weak-img>{img_src} : {img_alt}</catch-weak-img>'
+                                content.append(custom_tagged_img)
+                        elif element.name not in ['script', 'style'] and element.string and element.parent.name != 'em':
+                            text = element.string.strip() # 스크립트와 스타일 태그를 제외하고, em 태그의 부모가 아닌 경우만 텍스트를 추가
+                            if text:
+                                content.append(text)
+
+                    article_body = '\n'.join(content)
+                    print(article_body)
+                    article.body = article_body
 
                     # summary
                     media_end_summary_tag_list = dic_area_tag.findAll('strong')
