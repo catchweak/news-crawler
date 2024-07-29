@@ -168,7 +168,7 @@ def update_article_content(article: Article, db, division='plain'):
                             img_src = element.get('data-src', '')
                             img_alt = element.get('alt', '')
                             if img_src:  # data-src가 존재하는 경우에만 커스텀 태그로 감싸기
-                                custom_tagged_img = f'<catch-weak-img>{img_src} : {img_alt}</catch-weak-img>'
+                                custom_tagged_img = f'<catch-weak-img>{img_src}?alt={img_alt}</catch-weak-img>'
                                 content.append(custom_tagged_img)
                         elif element.name not in ['script', 'style'] and element.string and element.parent.name != 'em':
                             text = element.string.strip() # 스크립트와 스타일 태그를 제외하고, em 태그의 부모가 아닌 경우만 텍스트를 추가
