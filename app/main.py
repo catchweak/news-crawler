@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.scraper import scrap_url, scrap_detail_page, scrap_single_page, scrap_detail_page_redirected_url
+from app.scraper import scrap_url, scrap_detail_page, scrap_single_page, scrap_detail_page_redirected_url, scrap_shorts, download_shorts
 from .payload import UrlRequest
 
 app = FastAPI()
@@ -22,4 +22,14 @@ def scrap_url(request: UrlRequest):
 @app.get("/redirect-url-scrap")
 def redirect_url_scrap(division: str):
     scrap_detail_page_redirected_url(division)
+    return {"Hello": "World"}
+
+@app.get("/scrap-shorts")
+def redirect_url_scrap(keyword: str, requestCnt: int):
+    scrap_shorts(keyword, requestCnt)
+    return {"Hello": "World"}
+
+@app.get("/shorts-download")
+def redirect_url_scrap(shortsId: str):
+    download_shorts(shortsId)
     return {"Hello": "World"}
