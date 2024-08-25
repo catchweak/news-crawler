@@ -24,6 +24,9 @@ mysql = "^0.0.3"
 mysql-connector-python = "^8.4.0"
 alembic = "^1.13.1"
 sqlmodel = "^0.0.18"
+pandas = "^2.2.2"
+google-api-python-client = "^2.141.0"
+yt-dlp = "^2024.8.6"
 
 
 [build-system]

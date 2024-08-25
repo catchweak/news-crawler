@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from sqlalchemy.orm import sessionmaker
 from .database import SessionLocal
-from .models import Article
+from .models import Article, Channel, ShortsVideo
 from . import site_repo, category_repo
 from datetime import datetime
 import requests
@@ -14,7 +14,18 @@ import urllib.request
 from bs4 import BeautifulSoup
 import re
 import time
+from googleapiclient.discovery import build
+import json
+import os
+from .crud import create_channel, create_shorts_video
+from .utils import iso_to_datetime
+import yt_dlp as ytdlp
 
+SETTINGS_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.json')
+
+with open(SETTINGS_FILE_PATH, 'r') as file:
+    settings = json.load(file)
+    
 def scrap_url():
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
 
@@ -413,3 +424,82 @@ def scrap_detail_page_redirected_url(division):
             update_article_content(article, db, division)
     finally:
         db.close()
+
+def scrap_shorts(keyword, request_cnt):
+    """
+    쇼츠 정보 가져오기
+    """
+    db = SessionLocal()
+
+    api_key = settings['apiKey']
+
+    youtube = build('youtube', 'v3', developerKey=api_key)
+    channel_id = 'UCcQTRi69dsVYHN3exePtZ1A'  # KBS World TV 채널 ID
+    try:
+        request = youtube.search().list(
+            part='snippet', # snippet : 기본정보, statistics : 조회수, 좋아요 수, 댓글 수 등 통계 정보
+            channelId=channel_id,
+            order='viewCount',
+            q= keyword +' #Shorts',
+            type='video',
+            maxResults= request_cnt
+        )
+        response = request.execute()
+
+        video_ids = [item['id']['videoId'] for item in response['items']]
+
+        video_request = youtube.videos().list(
+            part='snippet,statistics',
+            id=','.join(video_ids)
+        )
+        video_response = video_request.execute()
+
+        # 조회수 기준으로 정렬
+        videos = sorted(video_response['items'], key=lambda x: int(x['statistics']['viewCount']), reverse=True)
+
+        for item in videos:
+            snippet = item.get('snippet', {})
+            statistics = item.get('statistics', {})
+
+            # 태그 정보
+            tags = ', '.join(snippet.get('tags', []))
+
+            # 채널 정보
+            channel_title = snippet.get('channelTitle', 'Unknown Channel')
+            existing_channel = db.query(Channel).filter(Channel.channel_id == channel_id).first()
+            if not existing_channel:
+                create_channel(db, channel_id, channel_title)
+
+            create_shorts_video(db, 
+                video_id=item['id'], # string
+                title=snippet.get('title', 'No title available'),
+                description=snippet.get('description', 'No description available'),
+                published_at=iso_to_datetime(snippet.get('publishedAt')),
+                view_count=int(statistics.get('viewCount', 0)),
+                like_count=int(statistics.get('likeCount', 0)),
+                comment_count=int(statistics.get('commentCount', 0)),
+                thumbnail_url=snippet.get('thumbnails', {}).get('maxres', {}).get('url', 'No thumbnail available'),
+                channel_id=channel_id,
+                tags=tags
+            )
+    finally:
+        db.close()
+
+def download_shorts(shorts_id):
+    download_path = settings['downloadPath']
+
+    url = 'https://www.youtube.com/shorts/' + shorts_id
+
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': f'{download_path}/%(title)s.%(ext)s',  # 비디오 제목을 파일명으로 사용합니다.
+        'quiet': False, # console log
+    }
+
+    try:
+        with ytdlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+            print(f"Video downloaded successfully: {url}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+

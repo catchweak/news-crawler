@@ -56,3 +56,34 @@ class Article(Base):
 
     # def __str__(s):
     #     return "id: " + s.id + ", category_id: " + str(s.category_id) + ", url: " + s.url + ", origin_url: " + s.origin_url + ", headline: " + s.headline + ", body: " + s.body + ", img_url: " + s.img_url + ", summary: " + s.summary + ", author: " + s.author + ", article_created_at: " + s.article_created_at + ", article_updated_at: " + s.article_updated_at
+
+
+class Channel(Base):
+    __tablename__ = 'youtube_channels'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    channel_id = Column(String(50), unique=True, nullable=False)
+    channel_title = Column(String(255), nullable=False)
+    description = Column(String(1000))
+    published_at = Column(DateTime)
+
+    videos = relationship("ShortsVideo", back_populates="channel")
+
+# Shorts 비디오 모델
+class ShortsVideo(Base):
+    __tablename__ = 'shorts_video'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    video_id = Column(String(50), unique=True, nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(String(1000))
+    published_at = Column(DateTime)
+    view_count = Column(Integer)
+    like_count = Column(Integer)
+    comment_count = Column(Integer)
+    thumbnail_url = Column(String(1000))
+    tags = Column(String(5000))
+    channel_id = Column(String(50), ForeignKey('youtube_channels.channel_id'), nullable=False)
+    
+
+    channel = relationship("Channel", back_populates="videos")
