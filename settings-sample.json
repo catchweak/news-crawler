@@ -7,5 +7,12 @@
     "dbname": "DATABASE"
   },
   "apiKey": "APIKEY",
-  "downloadPath": "./downloads"
+  "downloadPath": "./downloads",
+  "mongodb": {
+    "username": "USERNAME",
+    "password": "PASSWORD",
+    "host": "HOST",
+    "port": 27017,
+    "dbname": "DATABASE"
+  }
 }

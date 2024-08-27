@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 from .database import SessionLocal
 from .models import Article, Channel, ShortsVideo
 from . import site_repo, category_repo
@@ -20,6 +21,8 @@ import os
 from .crud import create_channel, create_shorts_video
 from .utils import iso_to_datetime
 import yt_dlp as ytdlp
+from pymongo import MongoClient
+import gridfs
 
 SETTINGS_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.json')
 
@@ -436,42 +439,54 @@ def scrap_shorts(keyword, request_cnt):
     youtube = build('youtube', 'v3', developerKey=api_key)
     channel_id = 'UCcQTRi69dsVYHN3exePtZ1A'  # KBS World TV 채널 ID
     try:
-        request = youtube.search().list(
-            part='snippet', # snippet : 기본정보, statistics : 조회수, 좋아요 수, 댓글 수 등 통계 정보
-            channelId=channel_id,
-            order='viewCount',
-            q= keyword +' #Shorts',
-            type='video',
-            maxResults= request_cnt
-        )
-        response = request.execute()
+        results = []
+        next_page_token = None
+        keyword_query = (keyword + ' #Shorts') if keyword else '#Shorts'
 
-        video_ids = [item['id']['videoId'] for item in response['items']]
+        # 검색 요청을 반복하면서 비디오 ID를 청크로 나눔
+        while True:
+            request = youtube.search().list(
+                part='snippet',
+                channelId=channel_id,
+                order='date',
+                q=keyword_query,
+                type='video',
+                maxResults=min(request_cnt, 50),  # 한 번에 최대 50개
+                pageToken=next_page_token
+            )
+            response = request.execute()
 
-        video_request = youtube.videos().list(
-            part='snippet,statistics',
-            id=','.join(video_ids)
-        )
-        video_response = video_request.execute()
+            video_ids = [item['id']['videoId'] for item in response['items']]
+            if not video_ids:
+                break
 
-        # 조회수 기준으로 정렬
-        videos = sorted(video_response['items'], key=lambda x: int(x['statistics']['viewCount']), reverse=True)
+            video_request = youtube.videos().list(
+                part='snippet,statistics',
+                id=','.join(video_ids)
+            )
+            video_response = video_request.execute()
 
-        for item in videos:
+            # 조회수 기준으로 정렬
+            videos = sorted(video_response['items'], key=lambda x: int(x['statistics']['viewCount']), reverse=True)
+            results.extend(videos)
+
+            next_page_token = response.get('nextPageToken')
+            if not next_page_token or len(results) >= request_cnt:
+                break
+
+        # DB 저장 작업 등 처리
+        for item in results:
             snippet = item.get('snippet', {})
             statistics = item.get('statistics', {})
 
-            # 태그 정보
             tags = ', '.join(snippet.get('tags', []))
-
-            # 채널 정보
             channel_title = snippet.get('channelTitle', 'Unknown Channel')
             existing_channel = db.query(Channel).filter(Channel.channel_id == channel_id).first()
             if not existing_channel:
                 create_channel(db, channel_id, channel_title)
 
             create_shorts_video(db, 
-                video_id=item['id'], # string
+                video_id=item['id'],
                 title=snippet.get('title', 'No title available'),
                 description=snippet.get('description', 'No description available'),
                 published_at=iso_to_datetime(snippet.get('publishedAt')),
@@ -485,21 +500,79 @@ def scrap_shorts(keyword, request_cnt):
     finally:
         db.close()
 
-def download_shorts(shorts_id):
+
+def download_shorts(batch_size=100):
+    """
+    DB에서 비디오 ID를 100개씩 조회하여 다운로드하고 MongoDB에 저장
+    """
+    db = SessionLocal()
+    mongo_settings = settings['mongodb']
+    client = MongoClient(
+        f"mongodb://{mongo_settings['username']}:{mongo_settings['password']}@"
+        f"{mongo_settings['host']}:{mongo_settings['port']}/"
+    )
+    mongodb = client[mongo_settings['dbname']]
+    fs = gridfs.GridFS(mongodb)
+    files_collection = mongodb['fs.files']
+    chunks_collection = mongodb['fs.chunks']
+
     download_path = settings['downloadPath']
-
-    url = 'https://www.youtube.com/shorts/' + shorts_id
-
     ydl_opts = {
         'format': 'best',
         'outtmpl': f'{download_path}/%(title)s.%(ext)s',  # 비디오 제목을 파일명으로 사용합니다.
-        'quiet': False, # console log
+        'quiet': False,  # console log
     }
 
     try:
-        with ytdlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-            print(f"Video downloaded successfully: {url}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        offset = 0
+        while True:
+            shorts_videos = db.query(ShortsVideo).offset(offset).limit(batch_size).all()
+            
+            if not shorts_videos:
+                break
+            
+            for video in shorts_videos:
+                url = 'https://www.youtube.com/shorts/' + video.video_id
+                try:
+                    with ytdlp.YoutubeDL(ydl_opts) as ydl:
+                        info_dict = ydl.extract_info(url, download=True)
+                        file_path = ydl.prepare_filename(info_dict)
+                        print(f"Video downloaded successfully: {video.title} ({url})")
 
+                    existing_file = files_collection.find_one({'metadata.video_id': video.video_id})
+
+                    if existing_file:
+                        print(f"Video already exists in MongoDB: {video.title}")
+                        # 로컬 파일 삭제
+                        os.remove(file_path)
+                        continue
+
+                    with open(file_path, 'rb') as video_file:
+                        file_id = fs.put(
+                            video_file,
+                            filename=os.path.basename(file_path),
+                            video_id=video.video_id,
+                            metadata={
+                                'title': video.title,
+                                'description': video.description,
+                                'published_at': video.published_at,
+                                'view_count': video.view_count,
+                                'like_count': video.like_count,
+                                'comment_count': video.comment_count,
+                                'thumbnail_url': video.thumbnail_url,
+                                'tags': video.tags,
+                                'channel_id': video.channel_id
+                            }
+                        )
+                        print(f"Video stored in MongoDB: {video.title}")
+                    os.remove(file_path)
+
+                except Exception as e:
+                    print(f"An error occurred while downloading {video.title}: {e}")
+
+            offset += batch_size
+
+    except SQLAlchemyError as e:
+        print(f"An error occurred during the database operation: {e}")
+    finally:
+        db.close()

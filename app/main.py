@@ -25,11 +25,11 @@ def redirect_url_scrap(division: str):
     return {"Hello": "World"}
 
 @app.get("/scrap-shorts")
-def redirect_url_scrap(keyword: str, requestCnt: int):
+def redirect_url_scrap(keyword: str = '', requestCnt: int = 0):
     scrap_shorts(keyword, requestCnt)
     return {"Hello": "World"}
 
 @app.get("/shorts-download")
-def redirect_url_scrap(shortsId: str):
-    download_shorts(shortsId)
+def redirect_url_scrap():
+    download_shorts()
     return {"Hello": "World"}

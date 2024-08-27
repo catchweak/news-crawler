@@ -11,20 +11,22 @@ create table if not exists catch_weak.youtube_channels
 CREATE TABLE if not exists catch_weak.shorts_video
 (
     id            bigint auto_increment primary key comment 'id',
-    video_id      VARCHAR(50) NOT NULL COMMENT 'YouTube 비디오 ID',
-    title         VARCHAR(255)       NOT NULL COMMENT '비디오 제목',
+    video_id      VARCHAR(50)  NOT NULL COMMENT 'YouTube 비디오 ID',
+    title         VARCHAR(255) NOT NULL COMMENT '비디오 제목',
     description   TEXT COMMENT '비디오 설명',
     published_at  DATETIME COMMENT '비디오 게시 날짜',
     view_count    INT COMMENT '조회수',
     like_count    INT COMMENT '좋아요 수',
     comment_count INT COMMENT '댓글 수',
     thumbnail_url TEXT COMMENT '썸네일 URL',
-    channel_id    VARCHAR(50)        NOT NULL,
+    channel_id    VARCHAR(50)  NOT NULL,
+    tags          varchar(255) comment '태그',
+    scraped_at datetime(6) default now() comment '데이터 수집일',
     FOREIGN KEY (channel_id) REFERENCES catch_weak.youtube_channels (channel_id)
 );
 
-ALTER TABLE catch_weak.shorts_video
-ADD COLUMN tags TEXT COMMENT '비디오 태그';
+-- ALTER TABLE catch_weak.shorts_video
+-- ADD COLUMN tags TEXT COMMENT '비디오 태그';
 
 -- CREATE TABLE IF NOT EXISTS catch_weak.tags (
 --     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Tag ID',
