@@ -13,6 +13,11 @@
     "password": "PASSWORD",
     "host": "HOST",
     "port": 27017,
-    "dbname": "DATABASE"
+    "dbname": "DATABASE",
+    "options": {
+      "retryWrites": true,
+      "w": "majority",
+      "appName": "APPNAME"
+    }
   }
 }

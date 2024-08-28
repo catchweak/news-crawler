@@ -507,10 +507,13 @@ def download_shorts(batch_size=100):
     """
     db = SessionLocal()
     mongo_settings = settings['mongodb']
-    client = MongoClient(
-        f"mongodb://{mongo_settings['username']}:{mongo_settings['password']}@"
-        f"{mongo_settings['host']}:{mongo_settings['port']}/"
-    )
+
+    client = MongoClient(f"mongodb+srv://{mongo_settings['username']}:{mongo_settings['password']}@{mongo_settings['host']}/?retryWrites=true&w=majority&appName={mongo_settings['options']['appName']}")
+    # local
+    # client = MongoClient(
+    #     f"mongodb://{mongo_settings['username']}:{mongo_settings['password']}@"
+    #     f"{mongo_settings['host']}:{mongo_settings['port']}/"
+    # )
     mongodb = client[mongo_settings['dbname']]
     fs = gridfs.GridFS(mongodb)
     files_collection = mongodb['fs.files']
