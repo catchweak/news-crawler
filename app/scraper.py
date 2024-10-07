@@ -23,6 +23,7 @@ from .utils import iso_to_datetime
 import yt_dlp as ytdlp
 from pymongo import MongoClient
 import gridfs
+from datetime import datetime
 
 SETTINGS_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.json')
 
@@ -38,19 +39,19 @@ def scrap_url():
         categories = category_repo.get_categories(site.id)
 
         for category in categories:
-            if category.code == '250':
+            if category.code == '107':
                 target_url = site.base_url + '/'+ category.parent_code +'/'+ category.code # str(264) -> category.code
                 print(target_url)
 
                 try:
                     driver.get(target_url)
-                    more_news_click(driver, category.id, site.id) # section이 category.id가 되면됨
+                    more_news_click(driver, category, site.id) # section이 category.id가 되면됨
                     print("All tasks completed. The browser will remain open.")
                 except Exception as e:
                     print(f'An error occurred during the main execution: {e}')
             
 
-def more_news_click(driver, category_id, site_id):
+def more_news_click(driver, category, site_id):
     """
     뉴스 더보기 클릭
     """
@@ -76,32 +77,30 @@ def more_news_click(driver, category_id, site_id):
             driver.execute_script("arguments[0].click();", a_tag)
             print("Clicked 'more news' button.")
         except Exception as e:
-            get_detail_url(driver, category_id)
+            get_detail_url(driver, category)
             print(f'Exception occurred: {e}')
             break
 
-def get_detail_url(driver, category_id):
+def get_detail_url(driver, category):
     """
     상세페이지 url 조사
     """
-
     news_url_tag = WebDriverWait(driver, 100).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="newsct"]/div[2]/div/div[1]/div/ul/li/div/div/div/a'))
     )
     news_url_tags = news_url_tag.find_elements(By.XPATH, '//*[@id="newsct"]/div[2]/div/div[1]/div/ul/li/div/div/div/a')
 
-    # 각 링크 요소의 href 속성 값 가져와 출력
     for news_url_tag in news_url_tags:
         news_url = news_url_tag.get_attribute("href")
-        save_to_db(news_url, category_id)
+        save_to_db(news_url, category)
 
-def save_to_db(news_url, category_id):
+def save_to_db(news_url, category):
     """
     DB에 기사 데이터 저장
     """
     db = SessionLocal()
     try:
-        article = Article(url=news_url, category_id=category_id)
+        article = Article(url=news_url, categories=[category])
         db.add(article)
         db.commit()
     except Exception as e:
@@ -132,8 +131,10 @@ def scrap_detail_page():
         # articles = db.query(Article).all()
         # articles = db.query(Article).limit(1).all()
         # articles = db.query(Article).filter(Article.headline.is_(None)).all()
-        articles = db.query(Article).filter(Article.author.is_(None)).all()
-
+        date_cutoff = datetime(2024, 9, 24)
+        articles = db.query(Article).filter(Article.author.is_(None)).filter(Article.collected_at > date_cutoff).all()
+        print("=== articles ===")
+        print(str(len(articles)))
         for article in articles:
             update_article_content(article, db)
     finally:
