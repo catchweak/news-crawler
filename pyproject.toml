@@ -27,6 +27,7 @@ sqlmodel = "^0.0.18"
 pandas = "^2.2.2"
 google-api-python-client = "^2.141.0"
 yt-dlp = "^2024.8.6"
+pymongo = "^4.10.1"
 
 
 [build-system]
